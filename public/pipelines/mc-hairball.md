@@ -131,7 +131,7 @@ Then these will get combined to
 |bye  |sample1|myFirstWorkflow|today       |
 |bye  |sample2|myFirstWorkflow|today       |
 
-#### Collapsing (or Folding) the table of Parameter values
+#### Collapsing the table of Parameter values
 Say we have the following combinations:
 
 |project |dir |sample |
@@ -142,7 +142,7 @@ Say we have the following combinations:
 |project2|dir2|sample4|
 
 Now if a particular step's protocol depends only on the value of parameter `project`, it only needs to be run twice, once for `project=project1` and once for `project=project2`.
-So the table of parameter combinations can be collapsed to the much smaller table.
+So the table of parameter combinations will be collapsed to the much smaller table.
 
 |project |
 |--------|
@@ -239,35 +239,121 @@ If values cannot be known at run-time, compute will give a generation error.
 
 ### Protocol headers
 #### Inputs and Outputs
-Each Protocol lists its Input parameters and its Output values in the header
-
+Each Protocol lists its Input parameters and its Output values in the header:
 
 ```
 #string project
 #string dir
-#list sample
 #output out1
 #output out2
 ```
 
-This header states that this Protocol depends on the values of three Input parameters named
-`project`, `dir`, and `sample` and that when it is run it produces two Output values, namely
-`out1` and `out2`.
-The script can handle only a single combination of the `#string` parameters at a time, but the `#list` prefix means it can handle all existing values for out1 and out2. `out1` and `out2` will contain a list of all values.
+This header states that this Protocol depends on the values of two Input parameters named
+`project`, `dir` and that when it is run it produces two Output values, namely `out1` and `out2`.
+The script can handle only a single combination of the `#string` parameters at a time.
 
-Multiple inputs may be specified on one line, e.g.
-
+Multiple inputs may be specified on one line, so instead of 
+```
+#string project
+#string dir
+```
+you may also write
 ```
 #string project,dir
 ```
 
-You can also use this for list inputs:
+#### List parameters
+Say you have the following parameter combinations
+
+|project |dir |sample |
+|--------|----|-------|
+|project1|dir1|sample1|
+|project1|dir2|sample2|
+|project1|dir2|sample3|
+|project2|dir2|sample4|
+
+And your step's protocol only has ```#string project``` input.
+Then the step will be run twice, for the following collapsed parameter combinations
+
+|project |
+|--------|
+|project1|
+|project2|
+
+But in the step you may still be interested in the values for the ```dir``` and ```sample``` parameter that got collapsed
+into this step.
+
+|project |dir |sample |
+|--------|----|-------|
+|project1|dir1|sample1|
+|        |dir2|sample2|
+|        |dir2|sample3|
+|project2|dir2|sample4|
+
+In this case you should use the ```#list``` header.
+
+```#list dir``` will create a list of all distinct values of the ```dir``` parameter that got collapsed
+into this step instance. Same for ```#list sample```.
+
+|project |#list dir |#list sample             |
+|--------|----------|-------------------------|
+|project1|dir1, dir2|sample1, sample2, sample3|
+|project2|dir2      |sample4                  |
+
+So in this case two scripts will be created:
 
 ```
-#list sample,dir
+project   = "project1"
+dir[0]    = "dir1"
+dir[1]    = "dir2"
+sample[0] = "sample1"
+sample[1] = "sample2"
+sample[2] = "sample3"
 ```
-This is called "Combined lists notation".
-TODO: Find out what's different about this notation
+
+and 
+
+```
+project   = "project1"
+dir[0]    = "dir2"
+sample[0] = "sample4"
+```
+
+Maybe you're interested in what **combinations** of parameters got collapsed into this job instance. 
+Then you can specify a comma-separated list of parameters:
+
+```
+#list dir, sample
+```
+
+Then for each instance of the step, you'll receive a list of the unique combinations of parameter values that got
+collapsed into this step.
+
+|project |#list dir, sample                                |
+|--------|-------------------------------------------------|
+|project1|(dir1, sample1), (dir2, sample2), (dir2, sample3)|
+|project2|(dir2, sample4)                                  |
+
+This list will be split into two separate lists, so in this case two scripts will be generated:
+```
+project   = "project1"
+dir[0]    = "dir1"
+dir[1]    = "dir2"
+dir[2]    = "dir2"
+sample[0] = "sample1"
+sample[1] = "sample2"
+sample[2] = "sample3"
+```
+
+and 
+
+```
+project   = "project1"
+dir[0]    = "dir2"
+sample[0] = "sample4"
+```
+
+> Each parameter may occur at most once, either as ```#parameter``` or in a at most one of the ```#list``` clauses.
 
 #### Resource parameters
 
